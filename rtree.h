@@ -17,12 +17,15 @@ class Node{
         int numNodesPerPage(int dimensionality, int maxCap);
 
         Node getNode(int id, int dimensionality, int maxCap, FileHandler fh);
+
+        void storeNode(int id,FileHandler fh,int dime,int maxCap, Node n);
+
+
         bool check_if_leaf(int node_id,int dim,int mC,FileHandler fh);
 
-        void update_mbr(int* P, int node_id,int dimensionality, int maxCap,FileHandler fh, bool to_split, int new_node_id);
 
-        void split(int orginal_node_id,int new_node_id,int dim,int mC,FileHandler fh);
+        Node split(int orginal_node_id,int* new_node_id,int dim,int mC,FileHandler fh,Node new_node_to_add);
 
-        void insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler fh,int new_ndoe_id);
+        std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler fh,int* new_node_id);
 
 };
