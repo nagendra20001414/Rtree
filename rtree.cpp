@@ -44,7 +44,7 @@ Node Node::getNode(int id, int dimensionality, int maxCap, FileHandler fh){
     memcpy(&data[((2*dimensionality)+1+maxCap)*int_increment], &myNode.children_MBR[0], maxCap*2*dimensionality*sizeof(int));
     return myNode;
 }
-
+//Function to store a node in a page
 void Node::storeNode(int id,FileHandler fh,int dim,int maxCap,Node n){
     int page_num = int(id/numNodesPerPage(dim,maxCap));
     int page_mod = id%numNodesPerPage(dim,maxCap);
@@ -68,7 +68,7 @@ void Node::storeNode(int id,FileHandler fh,int dim,int maxCap,Node n){
     memcpy(&data[start_pos],&(n.children_MBR),sizeof(int)*maxCap*dim*2);
 }
 
-
+//generates MBR from an old MBR and d-dimensional point
 int* generate_new_mbr(int* current_mbr, int* new_point,int dim){
 
     int new_mbr[2*dim];
@@ -84,7 +84,7 @@ int* generate_new_mbr(int* current_mbr, int* new_point,int dim){
     return new_mbr;
 }
 
-//last
+//generates MBR from an old MBR and another MBR
 // int* generate_new_mbr_2d(int* current_mbr,int* new_mbr, int dim){
 //     int new_mbr[2*dim];
 //     for (int i=0;i<2*dim;i++){
@@ -92,6 +92,7 @@ int* generate_new_mbr(int* current_mbr, int* new_point,int dim){
 //     }
 // }
 
+//Function to generate volume from an MBR
 int get_volume(int* mbr,int dim){
     int vol = 1;
     for (int i=0;i<dim;i++){
@@ -100,6 +101,7 @@ int get_volume(int* mbr,int dim){
     return vol;
 }
 
+//Given a node id, is it a leaf?
 bool Node::check_if_leaf(int node_id,int dim,int mC,FileHandler fh){
     Node n = getNode(node_id,dim,mC,fh);
     for (int i=dim;i<2*dim;i++){
@@ -112,7 +114,7 @@ bool Node::check_if_leaf(int node_id,int dim,int mC,FileHandler fh){
     return true;
 
 }
-
+//Distance between 2 MBRs
 int distance(int* p1, int*p2, int dim){
     int dis = 0;
     for (int i=0;i<2*dim;i++){
@@ -121,6 +123,7 @@ int distance(int* p1, int*p2, int dim){
     return dis;
 }
 
+//Splits a node into 2. Returns the new node
 Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandler fh,Node new_node_to_add){
     Node org_node = getNode(original_node_id,dim,mC,fh);
 
@@ -253,7 +256,7 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
     return new_node;
 }
 
-
+//The main insert function
 std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler fh,int *new_node_id){
     Node root_node = getNode(root_id,dimensionality,maxCap,fh);
     
