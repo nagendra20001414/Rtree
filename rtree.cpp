@@ -29,19 +29,21 @@ int Node::numNodesPerPage(int dimensionality, int maxCap){
 }
 
 Node Node::getNode(int id, int dimensionality, int maxCap, FileHandler fh){
-    PageHandler ph = fh.PageAt(int(id/numNodesPerPage(dimensionality, maxCap)));
-    char *data = ph.GetData();
     int int_increment = sizeof(int)/sizeof(char);
+    PageHandler ph = fh.PageAt(int(id/numNodesPerPage(dimensionality, maxCap)));
+    int page_offset = id % numNodesPerPage(dimensionality, maxCap);
+    page_offset *= (((2*dimensionality)+2+maxCap+(maxCap*2*dimensionality))*int_increment);
+    char *data = ph.GetData();
     int node_id;
-    memcpy(&data[0], &node_id, sizeof(int));
+    memcpy(&data[page_offset], &node_id, sizeof(int));
     int* current_MBR = new int[2*dimensionality];
-    memcpy(&data[int_increment], &current_MBR[0], 2*dimensionality*sizeof(int));
+    memcpy(&data[page_offset+int_increment], &current_MBR[0], 2*dimensionality*sizeof(int));
     int parent_id;
-    memcpy(&data[2*dimensionality*int_increment], &parent_id, sizeof(int));
+    memcpy(&data[page_offset+2*dimensionality*int_increment], &parent_id, sizeof(int));
     int* children = new int[maxCap];
-    memcpy(&data[((2*dimensionality)+1)*int_increment], &children[0], maxCap*sizeof(int));
+    memcpy(&data[page_offset+((2*dimensionality)+1)*int_increment], &children[0], maxCap*sizeof(int));
     Node myNode = Node(id, dimensionality, current_MBR, parent_id, maxCap);
-    memcpy(&data[((2*dimensionality)+1+maxCap)*int_increment], &myNode.children_MBR[0], maxCap*2*dimensionality*sizeof(int));
+    memcpy(&data[page_offset+((2*dimensionality)+1+maxCap)*int_increment], &myNode.children_MBR[0], maxCap*2*dimensionality*sizeof(int));
     return myNode;
 }
 //Function to store a node in a page
