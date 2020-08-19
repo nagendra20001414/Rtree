@@ -28,4 +28,15 @@ class Node{
 
         std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler fh,int* new_node_id);
 
+        bool PointQuery(int* P, int node_id, int dimensionality, int maxCap, FileHandler fh);
+
+        bool is_leaf(Node node, int maxCap){
+            for (int i=0; i<maxCap; i++){
+                if (node.children[i]!=-1){
+                    return false;
+                }
+            }
+            return true;
+        };
+
 };

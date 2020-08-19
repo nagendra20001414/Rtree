@@ -356,4 +356,40 @@ std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int 
     
 }
 
+bool does_contain_mbr(int* big_mbr, int* small_mbr, int dimensionality){
+    for (int dimension=0; dimension<dimensionality; dimension++){
+        if (small_mbr[2*dimension]<big_mbr[2*dimension] || small_mbr[2*dimension+1]>big_mbr[2*dimension+1]){
+            return false;
+        }
+    }
+    return true;
+}
+
+bool Node::PointQuery(int* P, int node_id, int dimensionality, int maxCap, FileHandler fh){
+    Node search_node = getNode(node_id, dimensionality, maxCap, fh);
+
+    if (is_leaf(search_node, maxCap)){
+        // if the node is a leaf
+        for (int dimension=0; dimension<2*dimensionality; dimension++){
+            if (search_node.current_MBR[dimension]!=P[dimension]){
+                return false;
+            }
+        }
+        return true;
+    }
+    else{
+        for (int child=0; child<maxCap; child++){
+            if (search_node.children[child]==-1){
+                break;
+            }
+            if (does_contain_mbr(search_node.children_MBR[child], P, dimensionality)){
+                if (PointQuery(P, search_node.children[child], dimensionality, maxCap, fh)){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+}
+
 
