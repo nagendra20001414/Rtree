@@ -7,6 +7,7 @@
 #include "constants.h"
 
 
+
 //Constructor
 Node::Node(int id, int dimensionality, int* current_MBR, int parent_id, int maxCap){
     this->id = id;
@@ -37,13 +38,15 @@ Node Node::getNode(int id, int dimensionality, int maxCap, FileHandler fh){
     int node_id;
     memcpy(&data[page_offset], &node_id, sizeof(int));
     int* current_MBR = new int[2*dimensionality];
-    memcpy(&data[page_offset+int_increment], &current_MBR[0], 2*dimensionality*sizeof(int));
+    memcpy(&data[page_offset+int_increment], &current_MBR, 2*dimensionality*sizeof(int));
     int parent_id;
     memcpy(&data[page_offset+2*dimensionality*int_increment], &parent_id, sizeof(int));
     int* children = new int[maxCap];
-    memcpy(&data[page_offset+((2*dimensionality)+1)*int_increment], &children[0], maxCap*sizeof(int));
+    memcpy(&data[page_offset+((2*dimensionality)+1)*int_increment], &children, maxCap*sizeof(int));
     Node myNode = Node(id, dimensionality, current_MBR, parent_id, maxCap);
-    memcpy(&data[page_offset+((2*dimensionality)+1+maxCap)*int_increment], &myNode.children_MBR[0], maxCap*2*dimensionality*sizeof(int));
+    for (int child=0; child<maxCap; child++){
+        memcpy(&data[page_offset+((2*dimensionality)+1+maxCap+(child*2*dimensionality))*int_increment], &myNode.children_MBR[child], maxCap*2*dimensionality*sizeof(int));
+    }
     return myNode;
 }
 //Function to store a node in a page
@@ -358,9 +361,9 @@ std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int 
     
 }
 
-bool does_contain_mbr(int* big_mbr, int* small_mbr, int dimensionality){
+bool does_contain_mbr(int* mbr, int* point, int dimensionality){
     for (int dimension=0; dimension<dimensionality; dimension++){
-        if (small_mbr[2*dimension]<big_mbr[2*dimension] || small_mbr[2*dimension+1]>big_mbr[2*dimension+1]){
+        if (point[dimension]<mbr[dimension] || point[dimension]>mbr[dimensionality+dimension]){
             return false;
         }
     }
@@ -370,14 +373,24 @@ bool does_contain_mbr(int* big_mbr, int* small_mbr, int dimensionality){
 bool Node::PointQuery(int* P, int node_id, int dimensionality, int maxCap, FileHandler fh){
     Node search_node = getNode(node_id, dimensionality, maxCap, fh);
 
-    if (is_leaf(search_node, maxCap)){
+    if (is_leaf(search_node, maxCap, dimensionality)){
         // if the node is a leaf
-        for (int dimension=0; dimension<2*dimensionality; dimension++){
-            if (search_node.current_MBR[dimension]!=P[dimension]){
+        for (int child=0; child<maxCap; child++){
+            if (search_node.children[child]==-1){
                 return false;
             }
+            bool found = true;
+            for (int dimension=0; dimension<dimensionality; dimension++){
+                if (search_node.children_MBR[child][dimension]!=P[dimension] || search_node.children_MBR[child][dimension+dimensionality]!=P[dimension]){
+                    found=false;
+                    break;
+                }
+            }
+            if (found){
+                return true;
+            }
         }
-        return true;
+        return false;
     }
     else{
         for (int child=0; child<maxCap; child++){
@@ -395,3 +408,57 @@ bool Node::PointQuery(int* P, int node_id, int dimensionality, int maxCap, FileH
 }
 
 
+
+void saveNode(Node new_node, int dimensionality, int maxCap, PageHandler ph, int node_num){
+    int offset = node_num*new_node.size_of_node(dimensionality, maxCap);
+    char* data = ph.GetData();
+    int int_increment = sizeof(int)/sizeof(char);
+    memcpy(&new_node.id, &data[offset], sizeof(int));
+    memcpy(&new_node.current_MBR, &data[offset+int_increment], 2*dimensionality*sizeof(int));
+    memcpy(&new_node.parent_id, &data[offset+((2*dimensionality+1)*int_increment)], sizeof(int));
+    memcpy(&new_node.children, &data[offset+((2*dimensionality+2)*int_increment)], maxCap*sizeof(int));
+    for (int child=0; child<maxCap; child++){
+        memcpy(&new_node.children_MBR[child], &data[offset+((2*dimensionality+2+maxCap)*int_increment)], 2*dimensionality*sizeof(int));
+    }
+}
+
+std::tuple<std::string, int> BulkLoad(const char* filename, int N, int maxCap, int dimensionality){
+    FileManager fm;
+
+    FileHandler fh = fm.OpenFile(filename);
+
+    int remaining_points = N;
+    int node_id = 0;
+    FileHandler fh_out = fm.CreateFile("rtree.txt");
+    PageHandler ph;
+    char* data;
+    PageHandler ph_out = fh_out.NewPage();
+    int num_nodes_in_page = 0;
+    while(remaining_points!=0){
+        int S = std::min(maxCap, remaining_points);
+        Node new_node = Node(node_id, dimensionality, maxCap);
+        node_id += 1;
+        if (num_nodes_in_page==new_node.numNodesPerPage(dimensionality, maxCap)){
+            fh_out.MarkDirty(ph_out.GetPageNum());
+            fh_out.FlushPage(ph_out.GetPageNum());
+            fh_out.UnpinPage(ph_out.GetPageNum());
+            ph_out = fh_out.NewPage();
+            num_nodes_in_page = 0;
+        }
+        for (int i=0; i<S; i++){
+            ph = fh.PageAt(N-remaining_points);
+            data = ph.GetData();
+            // Unpinning the page.
+            fh.UnpinPage(N-remaining_points);
+            int* current_MBR = (int*)data;
+            new_node.children[i] = N-remaining_points; remaining_points--;
+            for (int dimension=0; dimension<dimensionality; dimension++){
+                new_node.children_MBR[i][dimension] = data[dimension];
+                new_node.children_MBR[i][dimension+dimensionality] = data[dimension];
+            }
+        }
+        saveNode(new_node, dimensionality, maxCap, ph_out, num_nodes_in_page);
+        num_nodes_in_page++;
+    }
+
+}
