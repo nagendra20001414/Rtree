@@ -1,9 +1,6 @@
 #include "file_manager.h"
-<<<<<<< HEAD
 #include "tuple"
-=======
 #include <cstring>
->>>>>>> 432e7e7b4d9d5f55eb9847a25dc70fcb229b3b74
 
 class Node{
     public:
