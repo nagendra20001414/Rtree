@@ -1,5 +1,9 @@
 #include "file_manager.h"
+<<<<<<< HEAD
 #include "tuple"
+=======
+#include <cstring>
+>>>>>>> 432e7e7b4d9d5f55eb9847a25dc70fcb229b3b74
 
 class Node{
     public:
@@ -15,9 +19,24 @@ class Node{
 
         Node(int id, int dimensionality, int* current_MBR, int parent_id, int maxCap);
 
-        int numNodesPerPage(int dimensionality, int maxCap);
+        Node(int id, int dimensionality, int maxCap){
+            this->id = id;
+            this->current_MBR = new int[2*dimensionality];
+            this->parent_id = -1;
+            this->children = new int[maxCap];
+            this->children_MBR = new int*[maxCap];
+            for (int i=0; i<maxCap; i++){
+                this->children[i] = -1;
+                this->children_MBR[i] = new int[2*dimensionality];
+            }
+        };
 
-        Node getNode(int id, int dimensionality, int maxCap, FileHandler fh);
+
+        // in terms of size of char
+        int size_of_node(int dimensionality, int maxCap){
+            int size = sizeof(int)/sizeof(char) * (2+(2*dimensionality)+maxCap+(maxCap*2*dimensionality));
+            return size;
+        };
 
         void storeNode(int id,FileHandler fh,int dime,int maxCap, Node n);
 
@@ -31,13 +50,19 @@ class Node{
 
         bool PointQuery(int* P, int node_id, int dimensionality, int maxCap, FileHandler fh);
 
-        bool is_leaf(Node node, int maxCap){
+        bool is_leaf(Node node, int maxCap, int dimensionality){
             for (int i=0; i<maxCap; i++){
-                if (node.children[i]!=-1){
-                    return false;
+                if (node.children[i]==-1){
+                    return true;
+                }
+                for (int dimension=0; dimension<dimensionality; dimension++){
+                    if (node.children_MBR[i][dimension]!=node.children_MBR[i][dimension+dimensionality]){
+                        return false;
+                    }
                 }
             }
             return true;
         };
+
 
 };
