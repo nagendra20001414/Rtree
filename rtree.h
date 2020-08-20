@@ -27,15 +27,12 @@ class Node{
             }
         };
 
-        int numNodesPerPage(int dimensionality, int maxCap);
 
         // in terms of size of char
         int size_of_node(int dimensionality, int maxCap){
             int size = sizeof(int)/sizeof(char) * (2+(2*dimensionality)+maxCap+(maxCap*2*dimensionality));
             return size;
         };
-
-        Node getNode(int id, int dimensionality, int maxCap, FileHandler fh);
 
         void storeNode(int id,FileHandler fh,int dime,int maxCap, Node n);
 
