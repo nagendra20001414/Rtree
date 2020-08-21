@@ -520,6 +520,30 @@ int* getMBR(int** children_MBR, int* children, int maxCap, int dimensionality){
     return MBR;
 }
 
+Node getNode_and_setParent(int id, int dimensionality, int maxCap, FileHandler fh, int parent_id){
+    int int_increment = sizeof(int)/sizeof(char);
+    int page_num = int(id/numNodesPerPage(dimensionality, maxCap));
+    PageHandler ph = fh.PageAt(page_num);
+    int page_offset = id % numNodesPerPage(dimensionality, maxCap);
+    page_offset *= (((2*dimensionality)+2+maxCap+(maxCap*2*dimensionality))*int_increment);
+    char *data = ph.GetData();
+    int node_id;
+    memcpy(&data[page_offset], &node_id, sizeof(int));
+    int* current_MBR = new int[2*dimensionality];
+    memcpy(&data[page_offset+int_increment], &current_MBR, 2*dimensionality*sizeof(int));
+    memcpy(&parent_id, &data[page_offset+2*dimensionality*int_increment], sizeof(int));
+    int* children = new int[maxCap];
+    memcpy(&data[page_offset+((2*dimensionality)+1)*int_increment], &children, maxCap*sizeof(int));
+    Node myNode = Node(id, dimensionality, current_MBR, parent_id, maxCap);
+    memcpy(&data[page_offset+((2*dimensionality)+1+maxCap)*int_increment], &myNode.children_MBR[0], maxCap*2*dimensionality*sizeof(int));
+    fh.MarkDirty(ph.GetPageNum());
+    fh.FlushPage(ph.GetPageNum());
+    fh.UnpinPage(ph.GetPageNum());
+    // fh.FlushPages();
+    return myNode;
+}
+
+
 int AssignParents(FileHandler fh, int start_index, int end_index, int dimensionality, int maxCap){
     PageHandler parent_nodes = fh.NewPage();
     int num_nodes_in_page = 0;
@@ -539,7 +563,7 @@ int AssignParents(FileHandler fh, int start_index, int end_index, int dimensiona
         Node new_node = Node(node_id, dimensionality, maxCap);
         node_id++; num_parents_created++;
         for (int i=0; i<S; i++){
-            Node child_node = getNode(end_index+1-remaining_nodes, dimensionality, maxCap, fh);
+            Node child_node = getNode_and_setParent(end_index+1-remaining_nodes, dimensionality, maxCap, fh, node_id-1);
             new_node.children[i] = end_index+1-remaining_nodes;
             new_node.children_MBR[i] = child_node.current_MBR;
             remaining_nodes--;
@@ -556,7 +580,7 @@ int AssignParents(FileHandler fh, int start_index, int end_index, int dimensiona
     return -1;
 }
 
-std::tuple<std::string, int> BulkLoad(const char* filename, int N, int maxCap, int dimensionality){
+std::tuple<FileHandler, int> BulkLoad(const char* filename, int N, int maxCap, int dimensionality){
     FileManager fm;
 
     FileHandler fh = fm.OpenFile(filename);
@@ -595,6 +619,10 @@ std::tuple<std::string, int> BulkLoad(const char* filename, int N, int maxCap, i
         saveNode(new_node, dimensionality, maxCap, ph_out, num_nodes_in_page);
         num_nodes_in_page++;
     }
+    fm.CloseFile(fh);
     int root_id = AssignParents(fh_out, 0, node_id-1, dimensionality, maxCap);
+    std::tuple <FileHandler, int> ans;
+    ans = std::make_tuple(fh_out, root_id);
+    return ans;
 }
 
