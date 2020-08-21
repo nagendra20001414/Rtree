@@ -79,7 +79,7 @@ void Node::storeNode(int id,FileHandler fh,int dim,int maxCap,Node n){
 //generates MBR from an old MBR and d-dimensional point
 int* generate_new_mbr(int* current_mbr, int* new_point,int dim){
 
-    int new_mbr[2*dim];
+    int* new_mbr = new int[2*dim];
     for(int i=0;i<2*dim;i++){
         if (i<dim){
             new_mbr[i] = std::min(std::min(current_mbr[i],current_mbr[i+dim]),new_point[i]);
@@ -93,13 +93,13 @@ int* generate_new_mbr(int* current_mbr, int* new_point,int dim){
 }
 
 // generates MBR from an old MBR and another MBR
-int* generate_new_mbr_2d(int* mbr1,int* mbr2, int dim){
-    int new_mbr[2*dim];
+void generate_new_mbr_2d(int* mbr1,int* mbr2, int* new_mbr,int dim){
+    // int new_mbr[2*dim];
     for (int i=0;i<dim;i++){
         new_mbr[i] = std::min(std::min(mbr1[i],mbr1[i+dim]),std::min(mbr2[i],mbr2[i+dim]));
         new_mbr[i+dim] = std::max(std::max(mbr1[i],mbr1[i+dim]),std::max(mbr2[i],mbr2[i+dim]));
     }
-    return new_mbr;
+    // return new_mbr;
 }
 
 //Function to generate volume from an MBR
@@ -136,7 +136,6 @@ int distance_points(int* p1, int*p2, int dim){
 //Distance Between 2 MBRs
 int distance_mbrs(int* mbr1, int* mbr2, int* new_mbr, int dim){
     int v1 = get_volume(mbr1,dim),v2=get_volume(mbr2,dim);
-    // int* new_mbr = generate_new_mbr_2d(mbr1,mbr2,dim);
     int v_new=get_volume(new_mbr,dim);
 
     return v_new-(v1+v2);
@@ -171,7 +170,8 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
                 if (new_node_to_add.current_MBR[dim+1]==-1){
                     d = distance_points(org_node.children_MBR[i],new_node_to_add.current_MBR,dim);
                 }else{
-                    int* new_mbr = generate_new_mbr_2d(org_node.children_MBR[i],new_node_to_add.current_MBR,dim);
+                    int new_mbr[2*dim];
+                    generate_new_mbr_2d(org_node.children_MBR[i],new_node_to_add.current_MBR,new_mbr,dim);
                     d = distance_mbrs(org_node.children_MBR[i],new_node_to_add.current_MBR,new_mbr,dim);
                 }
                 if (d>max_distance){
@@ -184,7 +184,8 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
                 if (new_node_to_add.current_MBR[dim+1]==-1){
                     d = distance_points(org_node.children_MBR[i],org_node.children_MBR[j],dim);
                 }else{
-                    int* new_mbr = generate_new_mbr_2d(org_node.children_MBR[i],org_node.children_MBR[j],dim);
+                    int new_mbr[2*dim];
+                    generate_new_mbr_2d(org_node.children_MBR[i],org_node.children_MBR[j],new_mbr,dim);
                     d = distance_mbrs(org_node.children_MBR[i],org_node.children_MBR[j],new_mbr,dim);
                 }
                 if (d>max_distance){
@@ -220,20 +221,23 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
                     if (j==e1 || j==e2){
                         continue;
                     }else{
+                        int temp_mbr[2*dim];
                         if (start_count1 == min_fill){
                             if (j==mC){
-                                mbr2 = generate_new_mbr_2d(mbr2,new_node_to_add.current_MBR,dim);
+                                generate_new_mbr_2d(mbr2,new_node_to_add.current_MBR,temp_mbr,dim);
                             }else{
-                                mbr2 = generate_new_mbr_2d(mbr2,org_node.children_MBR[j],dim);
+                                generate_new_mbr_2d(mbr2,org_node.children_MBR[j],temp_mbr,dim);
                             }
+                            mbr2 = temp_mbr;
                             groups[j]=true;
                             count2++;
                         }else{
                             if (j==mC){
-                                mbr1 = generate_new_mbr_2d(mbr1,new_node_to_add.current_MBR,dim);
+                                generate_new_mbr_2d(mbr1,new_node_to_add.current_MBR,temp_mbr,dim);
                             }else{
-                                mbr1 = generate_new_mbr_2d(mbr1,org_node.children_MBR[j],dim);
+                                generate_new_mbr_2d(mbr1,org_node.children_MBR[j],temp_mbr,dim);
                             }
+                            mbr1 = temp_mbr;
                             groups[j]=false;
                             count1++;
                         }
@@ -246,17 +250,19 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
             //See Step 13 of insert. and complete this portion. 
             //be mindful that when j==mC we look at the new_node
             int d1, d2;
-            int* new_mbr1,*new_mbr2;
-            int v1 = get_volume(mbr1),v2 = get_volume(mbr2);
+            // int* new_mbr1,*new_mbr2;
+            int new_mbr1[2*dim];
+            int new_mbr2[2*dim];
+            int v1 = get_volume(mbr1,dim),v2 = get_volume(mbr2,dim);
 
-            new_mbr1 = generate_new_mbr_2d(mbr1,org_node.children_MBR[i],dim);
+            generate_new_mbr_2d(mbr1,org_node.children_MBR[i],new_mbr1,dim);
             d1 = distance_mbrs(mbr1,org_node.children_MBR[i],new_mbr1,dim);
 
             if (i==mC){
-                new_mbr2 = generate_new_mbr_2d(mbr2,new_node_to_add.current_MBR,dim);
+                generate_new_mbr_2d(mbr2,new_node_to_add.current_MBR,new_mbr2,dim);
                 d2 = distance_mbrs(mbr2,new_node_to_add.current_MBR,new_mbr2,dim);
             }else{
-                new_mbr2 = generate_new_mbr_2d(mbr2,org_node.children_MBR[i],dim);
+                generate_new_mbr_2d(mbr2,org_node.children_MBR[i],new_mbr2,dim);
                 d2 = distance_mbrs(mbr2,org_node.children_MBR[i],new_mbr2,dim);
             }
 
@@ -307,14 +313,14 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
             }
         }
     }
-    storeNode(new_node,fh,dim,mC,new_node);
+    storeNode(new_node.id,fh,dim,mC,new_node);
     (*new_node_id)++;
 
     return new_node;
 }
 
 //The main insert function
-std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler fh,int *new_node_id){
+std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler fh,int* new_node_id){
     Node root_node = getNode(root_id,dimensionality,maxCap,fh);
     
 
@@ -325,7 +331,7 @@ std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int 
         new_node.current_MBR[i] = P[i-dimensionality];
     }
     if (is_leaf){
-        storeNode(*new_node_id,fh,dim,maxCap,new_node);
+        storeNode(*new_node_id,fh,dimensionality,maxCap,new_node);
         //Store P here
     }else{
 
@@ -347,7 +353,7 @@ std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int 
                 root_node.children[num_children] = *new_node_id;
                 root_node.children_MBR[num_children] = P;
                 (*new_node_id)++;
-                return std::make_tuple(false,NULL); //to change
+                return std::make_tuple(false,Node(-1,0,{},-1,0)); //to change
             }else{
                 (*new_node_id)++;
                 Node ns = split(root_id,new_node_id,dimensionality,maxCap,fh,new_node);
@@ -396,7 +402,7 @@ std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int 
                 root_node.children_MBR[best_children] = generate_new_mbr(root_node.children_MBR[best_children],P,dimensionality);
                 root_node.current_MBR = generate_new_mbr(root_node.current_MBR,P,dimensionality);
                 storeNode(root_id,fh,dimensionality,maxCap,root_node);
-                return std::make_tuple(false,NULL);
+                return std::make_tuple(false,Node(-1,0,{},-1,0));
             }else{
                 if (num_children<maxCap){
                     root_node.children_MBR[best_children] = generate_new_mbr(root_node.children_MBR[best_children],P,dimensionality);
@@ -404,7 +410,7 @@ std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int 
                     root_node.children[num_children] = n.id;
                     root_node.children_MBR[num_children] = n.current_MBR;
                     storeNode(root_id,fh,dimensionality,maxCap,root_node);
-                    return std::make_tuple(false,NULL);
+                    return std::make_tuple(false,Node(-1,0,{},-1,0));
                 }else{
                     //update happens in split itself.
                     Node ns = split(root_id,new_node_id,dimensionality,maxCap,fh,n);
@@ -412,7 +418,8 @@ std::tuple<bool,Node> Node::insert(int* P, int root_id, int dimensionality, int 
 
                     //Check if this root_node was actually the root node of the full tree
                     if (root_node.parent_id==-1){
-                        int* new_root_mbr = generate_new_mbr_2d(root_node.current_MBR,ns.current_MBR,dimensionality);
+                        int new_root_mbr[2*dimensionality];
+                        generate_new_mbr_2d(root_node.current_MBR,ns.current_MBR,new_root_mbr,dimensionality);
                         Node new_root = Node(*new_node_id,dimensionality,new_root_mbr,-1,maxCap);
                         ns.parent_id = new_root.id;
                         root_node.parent_id = new_root.id;
