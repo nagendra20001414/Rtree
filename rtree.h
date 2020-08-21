@@ -35,7 +35,6 @@ class Node{
             return size;
         };
 
-        void storeNode(int id,FileHandler fh,int dime,int maxCap, Node n);
 
 
         bool check_if_leaf(int node_id,int dim,int mC,FileHandler fh);
@@ -63,3 +62,7 @@ class Node{
 
 
 };
+
+Node getNode(int id, int dimensionality, int maxCap, FileHandler fh);
+void storeNode(int id,FileHandler fh,int dime,int maxCap, Node n);
+

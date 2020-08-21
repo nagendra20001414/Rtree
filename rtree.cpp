@@ -35,28 +35,45 @@ Node getNode(int id, int dimensionality, int maxCap, FileHandler fh){
     PageHandler ph = fh.PageAt(page_num);
     int page_offset = id % numNodesPerPage(dimensionality, maxCap);
     page_offset *= (((2*dimensionality)+2+maxCap+(maxCap*2*dimensionality))*int_increment);
+    int read_pointer = page_offset;
     char *data = ph.GetData();
     int node_id;
-    memcpy(&data[page_offset], &node_id, sizeof(int));
+    // memcpy(&data[page_offset], &node_id, sizeof(int));
+    memcpy(&node_id, &data[read_pointer],  sizeof(int));
+    read_pointer+=int_increment;
     int* current_MBR = new int[2*dimensionality];
-    memcpy(&data[page_offset+int_increment], &current_MBR, 2*dimensionality*sizeof(int));
+    // memcpy(&data[page_offset+int_increment], &current_MBR, 2*dimensionality*sizeof(int));
+    memcpy(current_MBR, &data[read_pointer],  2*dimensionality*sizeof(int));
+    read_pointer+=(2*dimensionality)*int_increment;
     int parent_id;
-    memcpy(&data[page_offset+2*dimensionality*int_increment], &parent_id, sizeof(int));
+    // memcpy(&data[page_offset+2*dimensionality*int_increment], &parent_id, sizeof(int));
+    memcpy(&parent_id,&data[read_pointer],  sizeof(int));
+    read_pointer+=int_increment;
     int* children = new int[maxCap];
-    memcpy(&data[page_offset+((2*dimensionality)+1)*int_increment], &children, maxCap*sizeof(int));
+    // memcpy(&data[page_offset+((2*dimensionality)+1)*int_increment], &children, maxCap*sizeof(int));
+    memcpy(children, &data[read_pointer],  maxCap*sizeof(int));
+    read_pointer+=maxCap*int_increment;
+
     Node myNode = Node(id, dimensionality, current_MBR, parent_id, maxCap);
-    memcpy(&data[page_offset+((2*dimensionality)+1+maxCap)*int_increment], &myNode.children_MBR[0], maxCap*2*dimensionality*sizeof(int));
+    for (int i=0;i<maxCap;i++){
+        memcpy(myNode.children_MBR[i],&data[read_pointer],sizeof(int)*2*dimensionality);
+        read_pointer+=2*dimensionality*int_increment;
+    }
+    // memcpy(&data[page_offset+((2*dimensionality)+2+maxCap)*int_increment], &myNode.children_MBR[0], maxCap*2*dimensionality*sizeof(int));
+
     fh.UnpinPage(page_num);
     // fh.FlushPages();
     return myNode;
 }
 //Function to store a node in a page
-void Node::storeNode(int id,FileHandler fh,int dim,int maxCap,Node n){
+void storeNode(int id,FileHandler fh,int dim,int maxCap,Node n){
     int page_num = int(id/numNodesPerPage(dim,maxCap));
     int page_mod = id%numNodesPerPage(dim,maxCap);
     int node_size = sizeof(int) * (2+(2*dim)+maxCap+(maxCap*2*dim));
-    // int int_inc = sizeof(int)/sizeof(char); //Need to check this
+    int int_inc = sizeof(int)/sizeof(char); 
     int start_pos = page_mod*node_size;
+
+    std::cout<<"Page Num: "<<page_num<<" page_mod: "<<page_mod<<" node_size:"<<node_size<<" int_inc: "<<int_inc<<std::endl;
     PageHandler ph;
     if (page_mod ==0){
         ph = fh.NewPage();
@@ -64,16 +81,30 @@ void Node::storeNode(int id,FileHandler fh,int dim,int maxCap,Node n){
         ph = fh.PageAt(page_num);
     }
     char* data = ph.GetData();
-    memcpy(&data[start_pos++],&(n.id),sizeof(int));
-    // start_pos++;
-    memcpy(&data[start_pos],&(n.current_MBR),sizeof(2*dim));
-    start_pos+=2*dim;
-    memcpy(&data[start_pos++],&(n.parent_id),sizeof(int));
-    memcpy(&data[start_pos],&(n.children),sizeof(int)*maxCap);
-    start_pos+=maxCap;
-    memcpy(&data[start_pos],&(n.children_MBR),sizeof(int)*maxCap*dim*2);
+
+    memcpy(&data[start_pos],&(n.id),sizeof(int));
+    start_pos+=int_inc;
+
+    memcpy(&data[start_pos],(n.current_MBR),sizeof(int)*2*dim);
+
+    start_pos+=2*dim*int_inc;
+    memcpy(&data[start_pos],&(n.parent_id),sizeof(int));
+
+    start_pos+=int_inc;
+
+    memcpy(&data[start_pos],(n.children),sizeof(int)*maxCap);
+
+    
+    start_pos+=maxCap*int_inc;
+    for (int i=0;i<maxCap;i++){
+        memcpy(&data[start_pos],(n.children_MBR[i]),sizeof(int)*2*dim);
+
+        start_pos+=2*dim*int_inc;
+    }
+    
     fh.MarkDirty(page_num);
     fh.FlushPage(page_num);
+    // fh.FlushPages();
 }
 
 //generates MBR from an old MBR and d-dimensional point
