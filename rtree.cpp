@@ -513,7 +513,7 @@ int* getMBR(int** children_MBR, int* children, int maxCap, int dimensionality){
     return MBR;
 }
 
-void AssignParents(FileHandler fh, int start_index, int end_index, int dimensionality, int maxCap){
+int AssignParents(FileHandler fh, int start_index, int end_index, int dimensionality, int maxCap){
     PageHandler parent_nodes = fh.NewPage();
     int num_nodes_in_page = 0;
     int num_parents_created = 0;
@@ -543,7 +543,10 @@ void AssignParents(FileHandler fh, int start_index, int end_index, int dimension
     }
     if (num_parents_created>1){
         AssignParents(fh, end_index+1, end_index+num_parents_created, dimensionality, maxCap);
+    }else{
+        return node_id-1; //root node's id
     }
+    return -1;
 }
 
 std::tuple<std::string, int> BulkLoad(const char* filename, int N, int maxCap, int dimensionality){
@@ -585,6 +588,6 @@ std::tuple<std::string, int> BulkLoad(const char* filename, int N, int maxCap, i
         saveNode(new_node, dimensionality, maxCap, ph_out, num_nodes_in_page);
         num_nodes_in_page++;
     }
-    AssignParents(fh_out, 0, node_id-1, dimensionality, maxCap);
+    int root_id = AssignParents(fh_out, 0, node_id-1, dimensionality, maxCap);
 }
 
