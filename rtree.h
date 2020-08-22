@@ -37,14 +37,9 @@ class Node{
 
 
 
-        bool check_if_leaf(int node_id,int dim,int mC,FileHandler fh);
 
 
-        Node split(int orginal_node_id,int* new_node_id,int dim,int mC,FileHandler fh,Node new_node_to_add);
-
-        std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler fh,int* new_node_id);
-
-        bool PointQuery(int* P, int node_id, int dimensionality, int maxCap, FileHandler fh);
+        Node split(int orginal_node_id,int* new_node_id,int dim,int mC,FileHandler& fh,Node new_node_to_add);
 
         bool is_leaf(Node node, int maxCap, int dimensionality){
             for (int i=0; i<maxCap; i++){
@@ -63,6 +58,6 @@ class Node{
 
 };
 
-Node getNode(int id, int dimensionality, int maxCap, FileHandler fh);
-void storeNode(int id,FileHandler fh,int dime,int maxCap, Node n);
+Node getNode(int id, int dimensionality, int maxCap, FileHandler& fh);
+void storeNode(int id,FileHandler& fh,int dime,int maxCap, Node n);
 
