@@ -576,12 +576,6 @@ void saveNode(Node new_node, int dimensionality, int maxCap, PageHandler& ph, in
     // int offset = node_num*new_node.size_of_node(dimensionality, maxCap);
     int offset = (new_node.id%numNodesPerPage(dimensionality, maxCap)) * sizeof(int)/sizeof(char) * (2+(2*dimensionality)+maxCap+(maxCap*2*dimensionality));
     char* data = ph.GetData();
-    // if (new_node.id > 162 && new_node.id<190){
-    //     std::cout << ph.GetPageNum() << ": " << offset << std::endl;
-    //     int n;
-    //     memcpy(&n, &data[2368], sizeof(int));
-    //     std::cout << n << std::endl;
-    // }
     int int_increment = sizeof(int)/sizeof(char);
     memcpy(&data[offset], &new_node.id, sizeof(int));
     memcpy(&data[offset+int_increment], new_node.current_MBR, 2*dimensionality*sizeof(int));
@@ -590,18 +584,7 @@ void saveNode(Node new_node, int dimensionality, int maxCap, PageHandler& ph, in
     for (int child=0; child<maxCap; child++){
         memcpy(&data[offset+((2*dimensionality+2+maxCap+(child*2*dimensionality))*int_increment)], new_node.children_MBR[child], 2*dimensionality*sizeof(int));
     }
-    // if (new_node.id > 162 && new_node.id<190){
-    //     std::cout << ph.GetPageNum() << ": " << offset << std::endl;
-    //     int n;
-    //     memcpy(&n, &data[2368], sizeof(int));
-    //     std::cout << n << std::endl;
-    // }
 
-    if (new_node.id==163){
-        int n;
-        memcpy(&n, &data[offset], sizeof(int));
-        std::cout << n << "k" << std::endl;
-    }
 }
 
 int* getMBR(int** children_MBR, int* children, int maxCap, int dimensionality){
@@ -803,43 +786,6 @@ std::tuple<FileHandler, int, int> BulkLoad(FileHandler& fh, FileHandler& fh_out,
         num_nodes_in_page++;
         remaining_points--;
     }
-    // remaining_points = N;
-    // int start_index = node_id;
-    // while(remaining_points!=0){
-    //     int S = std::min(maxCap, remaining_points);
-    //     Node new_node = Node(node_id, dimensionality, maxCap);
-    //     node_id += 1;
-    //     if (num_nodes_in_page==numNodesPerPage(dimensionality, maxCap)){
-    //         fh_out.MarkDirty(ph_out.GetPageNum());
-    //         fh_out.UnpinPage(ph_out.GetPageNum());
-    //         fh_out.FlushPage(ph_out.GetPageNum());
-    //         ph_out = fh_out.NewPage();
-    //         std::cout << ph_out.GetPageNum() << std::endl;
-    //         num_nodes_in_page = 0;
-    //     }
-    //     for (int i=0; i<S; i++){
-    //         int page_id = (int)((N-remaining_points)/num_points_per_page);
-    //         ph = fh.PageAt(page_id);
-    //         data = ph.GetData();
-    //         // Unpinning the page.
-    //         fh.UnpinPage(page_id);
-    //         fh.FlushPage(page_id);
-    //         int offset = ((N-remaining_points)%num_points_per_page)*dimensionality;
-    //         int* current_MBR = (int*)data;
-    //         new_node.children[i] = N-remaining_points; 
-    //         for (int dimension=0; dimension<dimensionality; dimension++){
-    //             new_node.children_MBR[i][dimension] = data[dimension+offset];
-    //             new_node.children_MBR[i][dimension+dimensionality] = data[dimension+offset];
-    //         }
-    //         getNode_and_setParent(N-remaining_points, dimensionality, maxCap, fh_out, node_id-1);
-    //         remaining_points--;
-    //     }
-    //     new_node.current_MBR = getMBR(new_node.children_MBR, new_node.children, maxCap, dimensionality);
-    //     // std::cout << "ok3" << std::endl;
-    //     saveNode(new_node, dimensionality, maxCap, ph_out, num_nodes_in_page);
-    //     num_nodes_in_page++;
-    //     // std::cout << "ok2" << std::endl;
-    // }
     if (num_nodes_in_page>0){
         fh_out.MarkDirty(ph_out.GetPageNum());
         fh_out.UnpinPage(ph_out.GetPageNum());
