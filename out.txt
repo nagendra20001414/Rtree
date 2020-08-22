@@ -1,0 +1,9 @@
+BULKLOAD
+
+
+INSERT
+
+
+INSERT
+
+

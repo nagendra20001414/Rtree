@@ -711,6 +711,7 @@ std::tuple<FileHandler, int, int> BulkLoad(FileHandler& fh, FileHandler& fh_out,
         data = ph.GetData();
         // Unpinning the page.
         fh.UnpinPage(page_id);
+        fh.FlushPage(page_id);
         int offset = ((N-remaining_points)%num_points_per_page)*dimensionality;
         Node new_node = Node(node_id, dimensionality, maxCap);
         node_id +=1;
@@ -724,6 +725,7 @@ std::tuple<FileHandler, int, int> BulkLoad(FileHandler& fh, FileHandler& fh_out,
         remaining_points--;
     }
     remaining_points = N;
+    int start_index = node_id;
     while(remaining_points!=0){
         int S = std::min(maxCap, remaining_points);
         Node new_node = Node(node_id, dimensionality, maxCap);
@@ -742,6 +744,7 @@ std::tuple<FileHandler, int, int> BulkLoad(FileHandler& fh, FileHandler& fh_out,
             data = ph.GetData();
             // Unpinning the page.
             fh.UnpinPage(page_id);
+            fh.FlushPage(page_id);
             int offset = ((N-remaining_points)%num_points_per_page)*dimensionality;
             int* current_MBR = (int*)data;
             new_node.children[i] = N-remaining_points; 
@@ -758,15 +761,34 @@ std::tuple<FileHandler, int, int> BulkLoad(FileHandler& fh, FileHandler& fh_out,
         num_nodes_in_page++;
         // std::cout << "ok2" << std::endl;
     }
-    fh_out.MarkDirty(ph_out.GetPageNum());
-    fh_out.UnpinPage(ph_out.GetPageNum());
-    fh_out.FlushPage(ph_out.GetPageNum());
-    std::cout << ph_out.GetPageNum() << " wriiten" << std::endl;
-    int root_id = AssignParents(fh_out, 0, node_id-1, dimensionality, maxCap);
+    if (num_nodes_in_page>0){
+        fh_out.MarkDirty(ph_out.GetPageNum());
+        fh_out.UnpinPage(ph_out.GetPageNum());
+        fh_out.FlushPage(ph_out.GetPageNum());
+        std::cout << ph_out.GetPageNum() << " wriiten" << std::endl;
+   }
+    int root_id = AssignParents(fh_out, node_id, node_id-1, dimensionality, maxCap);
     fh_out.FlushPages();
     std::tuple <FileHandler, int, int> ans;
     ans = std::make_tuple(fh_out, root_id, root_id+1);
     return ans;
+}
+
+void checkTree(FileHandler& fh, int numNodes, int dimensionality, int maxCap){
+    int num_nodes_per_page = numNodesPerPage(dimensionality, maxCap);
+    PageHandler ph;
+    for (int i=0; i<numNodes; i++){
+        int page_id = int(i/num_nodes_per_page);
+        int offset = (i%num_nodes_per_page) * sizeof(int)/sizeof(char) * (2+(2*dimensionality)+maxCap+(maxCap*2*dimensionality));
+        int int_increment=sizeof(int)/sizeof(char);
+        ph = fh.PageAt(page_id);
+        char* data = ph.GetData();
+        int id;
+        memcpy(&id, &data[offset], sizeof(int));
+        std::cout << id << " check" << std::endl;
+        fh.UnpinPage(page_id);
+        fh.FlushPage(page_id);
+    }
 }
 
 
@@ -819,6 +841,7 @@ int main(int argv, char **argc){
                 output_file_handle << "BULKLOAD" << std::endl;
                 output_file_handle << std::endl;
                 output_file_handle << std::endl;
+                // checkTree(fh_rtree, numNodes, dimensionality, maxCap);
             }else if (query_type==1){
                 //insert
                 std::cout<<"Insert Statement"<<std::endl;
