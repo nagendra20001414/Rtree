@@ -49,13 +49,14 @@ class Node{
                 if (node.children[i]==-1){
                     return true;
                 }
-                for (int dimension=0; dimension<dimensionality; dimension++){
-                    if (node.children_MBR[i][dimension]!=node.children_MBR[i][dimension+dimensionality]){
-                        return false;
-                    }
+            }
+            for (int dimension=0; dimension<dimensionality; dimension++){
+                if (node.current_MBR[dimension]!=node.current_MBR[dimension+dimensionality]){
+                    return false;
                 }
             }
-            return true;
+            
+            return false;
         };
 
 

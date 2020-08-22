@@ -548,22 +548,12 @@ bool PointQuery(int* P, int node_id, int dimensionality, int maxCap, FileHandler
 
     if (search_node.is_leaf(search_node, maxCap, dimensionality)){
         // if the node is a leaf
-        for (int child=0; child<maxCap; child++){
-            if (search_node.children[child]==-1){
+        for (int dimension=0; dimension<dimensionality; dimension++){
+            if (search_node.current_MBR[dimension]!=P[dimension] || search_node.current_MBR[dimension+dimensionality]!=P[dimension]){
                 return false;
             }
-            bool found = true;
-            for (int dimension=0; dimension<dimensionality; dimension++){
-                if (search_node.children_MBR[child][dimension]!=P[dimension] || search_node.children_MBR[child][dimension+dimensionality]!=P[dimension]){
-                    found=false;
-                    break;
-                }
-            }
-            if (found){
-                return true;
-            }
         }
-        return false;
+        return true;
     }
     else{
         for (int child=0; child<maxCap; child++){
@@ -656,8 +646,7 @@ int AssignParents(FileHandler& fh, int start_index, int end_index, int dimension
     }else{
         int page_id = int(end_index/num_nodes_per_page);
         parent_nodes = fh.PageAt(page_id);
-        std::cout << "read " << parent_nodes.GetPageNum() << std::endl;
-        num_nodes_in_page = num_nodes_per_page - ((end_index+1)%num_nodes_per_page);
+        num_nodes_in_page = ((end_index+1)%num_nodes_per_page);
     }
     int num_parents_created = 0;
     int node_id = end_index+1;
@@ -684,10 +673,11 @@ int AssignParents(FileHandler& fh, int start_index, int end_index, int dimension
         saveNode(new_node, dimensionality, maxCap, parent_nodes, num_nodes_in_page);
         num_nodes_in_page++;
     }
-    fh.MarkDirty(parent_nodes.GetPageNum());
-    fh.UnpinPage(parent_nodes.GetPageNum());
-    fh.FlushPage(parent_nodes.GetPageNum());
-    std::cout << parent_nodes.GetPageNum() << " wriiten1" << std::endl;
+    if (num_nodes_in_page>0){
+        fh.MarkDirty(parent_nodes.GetPageNum());
+        fh.UnpinPage(parent_nodes.GetPageNum());
+        fh.FlushPage(parent_nodes.GetPageNum());
+    }
     if (num_parents_created>1){
         return AssignParents(fh, end_index+1, end_index+num_parents_created, dimensionality, maxCap);
     }else{
@@ -707,6 +697,33 @@ std::tuple<FileHandler, int, int> BulkLoad(FileHandler& fh, FileHandler& fh_out,
     int num_points_per_page = (int)PAGE_CONTENT_SIZE/(sizeof(int)*dimensionality);
     std::cout << "nodes per page: " << numNodesPerPage(dimensionality, maxCap) << std::endl;
     std::cout << ph_out.GetPageNum() << std::endl;
+    while (remaining_points!=0){
+        if (num_nodes_in_page==numNodesPerPage(dimensionality, maxCap)){
+            fh_out.MarkDirty(ph_out.GetPageNum());
+            fh_out.UnpinPage(ph_out.GetPageNum());
+            fh_out.FlushPage(ph_out.GetPageNum());
+            ph_out = fh_out.NewPage();
+            std::cout << ph_out.GetPageNum() << std::endl;
+            num_nodes_in_page = 0;
+        }
+        int page_id = (N-remaining_points)/num_points_per_page;
+        ph = fh.PageAt(page_id);
+        data = ph.GetData();
+        // Unpinning the page.
+        fh.UnpinPage(page_id);
+        int offset = ((N-remaining_points)%num_points_per_page)*dimensionality;
+        Node new_node = Node(node_id, dimensionality, maxCap);
+        node_id +=1;
+        int* current_MBR = (int*)data;
+        for (int dimension=0; dimension < dimensionality; dimension++){
+            new_node.current_MBR[dimension] = current_MBR[dimension];
+            new_node.current_MBR[dimension+dimensionality] = current_MBR[dimension];
+        }
+        saveNode(new_node, dimensionality, maxCap, ph_out, num_nodes_in_page);
+        num_nodes_in_page++;
+        remaining_points--;
+    }
+    remaining_points = N;
     while(remaining_points!=0){
         int S = std::min(maxCap, remaining_points);
         Node new_node = Node(node_id, dimensionality, maxCap);
@@ -727,11 +744,13 @@ std::tuple<FileHandler, int, int> BulkLoad(FileHandler& fh, FileHandler& fh_out,
             fh.UnpinPage(page_id);
             int offset = ((N-remaining_points)%num_points_per_page)*dimensionality;
             int* current_MBR = (int*)data;
-            new_node.children[i] = N-remaining_points; remaining_points--;
+            new_node.children[i] = N-remaining_points; 
             for (int dimension=0; dimension<dimensionality; dimension++){
                 new_node.children_MBR[i][dimension] = data[dimension+offset];
                 new_node.children_MBR[i][dimension+dimensionality] = data[dimension+offset];
             }
+            getNode_and_setParent(N-remaining_points, dimensionality, maxCap, fh_out, node_id-1);
+            remaining_points--;
         }
         new_node.current_MBR = getMBR(new_node.children_MBR, new_node.children, maxCap, dimensionality);
         // std::cout << "ok3" << std::endl;
