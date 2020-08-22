@@ -504,7 +504,8 @@ std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap
             Node n = std::get<1>(tup);
             if (b==false){
                 //update MBR here
-                root_node.children_MBR[best_children] = generate_new_mbr(root_node.children_MBR[best_children],P,dimensionality);
+                Node child_node = getNode(root_node.children[best_children],dimensionality,maxCap,fh);
+                root_node.children_MBR[best_children] = child_node.current_MBR;
                 root_node.current_MBR = generate_new_mbr(root_node.current_MBR,P,dimensionality);
                 storeNode(root_id,fh,dimensionality,maxCap,root_node);
                 return std::make_tuple(false,Node(-1,0,{},-1,0));
