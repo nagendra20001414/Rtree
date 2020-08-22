@@ -33,7 +33,7 @@ int numNodesPerPage(int dimensionality, int maxCap){
 Node getNode(int id, int dimensionality, int maxCap, FileHandler& fh){
     int int_increment = sizeof(int)/sizeof(char);
     int page_num = int(id/numNodesPerPage(dimensionality, maxCap));
-    std::cout << page_num << " page access" << std::endl;
+    // std::cout << page_num << " page access" << std::endl;
     PageHandler ph = fh.PageAt(page_num);
     int page_offset = id % numNodesPerPage(dimensionality, maxCap);
     page_offset *= (((2*dimensionality)+2+maxCap+(maxCap*2*dimensionality))*int_increment);
@@ -60,43 +60,52 @@ Node getNode(int id, int dimensionality, int maxCap, FileHandler& fh){
     for (int i=0;i<maxCap;i++){
         memcpy(myNode.children_MBR[i],&data[read_pointer],sizeof(int)*2*dimensionality);
         read_pointer+=2*dimensionality*int_increment;
+        myNode.children[i] = children[i];
     }
     // memcpy(&data[page_offset+((2*dimensionality)+2+maxCap)*int_increment], &myNode.children_MBR[0], maxCap*2*dimensionality*sizeof(int));
-
+    // fh.MarkDirty(page_num);
     fh.UnpinPage(page_num);
+    fh.FlushPage(page_num);
+
     // fh.FlushPages();
     return myNode;
 }
 //Function to store a node in a page
-void storeNode(int id,FileHandler& fh,int dim,int maxCap,Node n){
+void storeNode(int id,FileHandler& fh,int dim,int maxCap,Node &n){
     int page_num = int(id/numNodesPerPage(dim,maxCap));
     int page_mod = id%numNodesPerPage(dim,maxCap);
     int node_size = sizeof(int) * (2+(2*dim)+maxCap+(maxCap*2*dim));
     int int_inc = sizeof(int)/sizeof(char); 
     int start_pos = page_mod*node_size;
 
-    std::cout<<"Page Num: "<<page_num<<" page_mod: "<<page_mod<<" node_size:"<<node_size<<" int_inc: "<<int_inc<<std::endl;
+    // std::cout<<"Page Num: "<<page_num<<" page_mod: "<<page_mod<<" node_size:"<<node_size<<" int_inc: "<<int_inc<<std::endl;
     PageHandler ph;
-    if (page_mod ==0){
+    if (page_mod ==0 && fh.LastPage().GetPageNum()<page_num){
         ph = fh.NewPage();
+        // std::cout<<"new page allocated."<<std::endl;
     }else{
         ph = fh.PageAt(page_num);
+        // std::cout<<"old page selected"<<std::endl;
     }
     char* data = ph.GetData();
 
-    memcpy(&data[start_pos],&(n.id),sizeof(int));
+    memcpy(&data[start_pos],(&n.id),sizeof(int));
     start_pos+=int_inc;
 
     memcpy(&data[start_pos],(n.current_MBR),sizeof(int)*2*dim);
-
     start_pos+=2*dim*int_inc;
-    memcpy(&data[start_pos],&(n.parent_id),sizeof(int));
+
+    memcpy(&data[start_pos],(&n.parent_id),sizeof(int));
 
     start_pos+=int_inc;
-
+    // n.children[0] = 6969;
     memcpy(&data[start_pos],(n.children),sizeof(int)*maxCap);
-
-    
+    // for (int i=0;i<2;i++){
+    //     std::cout<<n.children[i]<<"\n";
+    // }
+    // int test;
+    // memcpy(&test,&data[start_pos],sizeof(int));
+    // std::cout<<"test: "<<test<<"\n";
     start_pos+=maxCap*int_inc;
     for (int i=0;i<maxCap;i++){
         memcpy(&data[start_pos],(n.children_MBR[i]),sizeof(int)*2*dim);
@@ -105,6 +114,7 @@ void storeNode(int id,FileHandler& fh,int dim,int maxCap,Node n){
     }
     
     fh.MarkDirty(page_num);
+    fh.UnpinPage(page_num);
     fh.FlushPage(page_num);
     // fh.FlushPages();
 }
@@ -147,8 +157,12 @@ int get_volume(int* mbr,int dim){
 //Given a node id, is it a leaf?
 bool check_if_leaf(int node_id,int dim,int mC,FileHandler& fh){
     Node n = getNode(node_id,dim,mC,fh);
+    if (n.children[0]!=-1){
+        return false;
+    }
+    return true;
     for (int i=0;i<dim;i++){
-        if (n.current_MBR[i] == n.current_MBR[i+dim]){
+        if ( (n.current_MBR[i] == n.current_MBR[i+dim])){
             continue;
         }else{
             return false;
@@ -175,9 +189,14 @@ int distance_mbrs(int* mbr1, int* mbr2, int* new_mbr, int dim){
 }
 
 //Splits a node into 2. Returns the new node
-Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandler& fh,Node new_node_to_add){
+Node Node::split(int original_node_id,int &new_node_id,int dim,int mC,FileHandler& fh,Node new_node_to_add){
     Node org_node = getNode(original_node_id,dim,mC,fh);
-
+    std::cout<<"Going to split node: "<<org_node.id<<std::endl;
+    std::cout<<"This node has children: ";
+    for (int i=0;i<mC;i++){
+        std::cout<<org_node.children[i]<<" ";
+    }
+    std::cout<<"\n";
     int min_fill = ceil(mC/2);
     //getting the farthest seeds
     int e1,e2,max_distance=-1;
@@ -195,6 +214,7 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
         checked_new_node = false;
 
         for (int j=i+1;j<mC+1;j++){
+            std::cout<<i<<" "<<j<<std::endl;
             if ((j==mC || org_node.children[j] == -1) && checked_new_node==true){
                 break;
             }else if(j==mC || org_node.children[j]==-1){
@@ -214,7 +234,8 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
                 }
             }else{
                 int d;
-                if (new_node_to_add.current_MBR[dim+1]==-1){
+                // if (new_node_to_add.current_MBR[dim+1]==-1){
+                if (new_node_to_add.children[0]==-1){
                     d = distance_points(org_node.children_MBR[i],org_node.children_MBR[j],dim);
                 }else{
                     int new_mbr[2*dim];
@@ -231,6 +252,7 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
         }
     }
 
+    std::cout<<"Farthest 2 seed's id: "<<e1<<":"<<org_node.children[e1]<<" and "<<e2<<":"<<org_node.children[e2]<<std::endl;
     //selecting which key goes to which. to new_node means true
     bool groups[mC+1];
     groups[e1]=true;
@@ -312,11 +334,16 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
         }
     }
 
+    std::cout<<"groups: ";
+    for (int i=0;i<mC+1;i++){
+        std::cout<<groups[i]<<" ";
+    }
+    std::cout<<"\n";
     //We now have groups with true meaning the new_node and false meaning the old_node
     int numC2=0;
     int numC1=0;
     // int new_node_MBR[2*dim];
-    Node new_node = Node(*new_node_id,dim,mbr2,-1,mC);
+    Node new_node = Node(new_node_id,dim,mbr2,-1,mC);
 
     for (int i=0;i<mC+1;i++){
         bool t = groups[i];
@@ -327,11 +354,11 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
                 new_node.children[numC2]=org_node.children[i];
                 new_node.children_MBR[numC2++] = org_node.children_MBR[i];
                 Node child_node = getNode(org_node.children[i],dim,mC,fh);
-                child_node.parent_id = *new_node_id;
+                child_node.parent_id = new_node_id;
             }else{
                 new_node.children[numC2]=new_node_to_add.id;
                 new_node.children_MBR[numC2++] = new_node_to_add.current_MBR;
-                new_node_to_add.parent_id = *new_node_id;
+                new_node_to_add.parent_id = new_node_id;
             }
 
         }else{
@@ -347,28 +374,38 @@ Node Node::split(int original_node_id,int *new_node_id,int dim,int mC,FileHandle
         }
     }
     storeNode(new_node.id,fh,dim,mC,new_node);
-    (*new_node_id)++;
-
+    storeNode(org_node.id,fh,dim,mC,org_node);
+    (new_node_id)++;
     return new_node;
 }
 
 //The main insert function
-std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler& fh,int* new_node_id){
+std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler& fh,int& new_node_id){
     Node root_node = getNode(root_id,dimensionality,maxCap,fh);
-    
+    std::cout<<"Current Node: "<<root_node.id<<std::endl;
 
     //Will come true if only root and is the first insert
     bool is_leaf = check_if_leaf(root_id,dimensionality,maxCap,fh);
-    Node new_node = Node(*new_node_id,dimensionality,P,root_id,maxCap);
+    std::cout<<"is_leaf: "<<is_leaf<<std::endl;
+
+    Node new_node = Node(new_node_id,dimensionality,P,root_id,maxCap);
     for (int i=dimensionality;i<2*dimensionality;i++){
         new_node.current_MBR[i] = P[i-dimensionality];
     }
     if (is_leaf){
-        storeNode(*new_node_id,fh,dimensionality,maxCap,new_node);
+        root_node.children[0] = new_node_id;
+        root_node.children_MBR[0] = P;
+        root_node.current_MBR = P;
+        
+        storeNode(new_node_id,fh,dimensionality,maxCap,new_node);
+        storeNode(root_id,fh,dimensionality,maxCap,root_node);
+        new_node_id++;
+        return std::make_tuple(false,Node(-1,0,{},-1,0));
         //Store P here
     }else{
 
         bool is_child_leaf = check_if_leaf(root_node.children[0],dimensionality,maxCap,fh);
+        std::cout<<"Is child a leaf? "<<is_child_leaf<<"\n";
         int num_children=0;
         for (int i=0;i<maxCap;i++){
             if (root_node.children[i]==-1){
@@ -381,15 +418,34 @@ std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap
 
         //Level below this node has leaves
         if (is_child_leaf){
-            Node new_node = Node(*new_node_id,dimensionality,P,root_id,maxCap);
+            // Node new_node = Node(new_node_id,dimensionality,P,root_id,maxCap);
             if (num_children<maxCap){
-                root_node.children[num_children] = *new_node_id;
+                root_node.children[num_children] = new_node_id;
                 root_node.children_MBR[num_children] = P;
-                (*new_node_id)++;
+                root_node.current_MBR = generate_new_mbr(root_node.current_MBR,P,dimensionality);
+                storeNode(root_id,fh,dimensionality,maxCap,root_node);
+                storeNode(new_node_id,fh,dimensionality,maxCap,new_node);
+                (new_node_id)++;
                 return std::make_tuple(false,Node(-1,0,{},-1,0)); //to change
             }else{
-                (*new_node_id)++;
+                (new_node_id)++;
                 Node ns = new_node.split(root_id,new_node_id,dimensionality,maxCap,fh,new_node);
+                if (root_node.parent_id==-1){
+                    int new_root_mbr[2*dimensionality];
+                    generate_new_mbr_2d(root_node.current_MBR,ns.current_MBR,new_root_mbr,dimensionality);
+                    Node new_root = Node(new_node_id,dimensionality,new_root_mbr,-1,maxCap);
+                    ns.parent_id = new_root.id;
+                    root_node.parent_id = new_root.id;
+                    new_root.children[0] = ns.id;
+                    new_root.children_MBR[0] = ns.current_MBR;
+                    new_root.children[1] = root_node.id;
+                    new_root.children_MBR[1] = root_node.current_MBR;
+                    storeNode(new_node_id,fh,dimensionality,maxCap,new_root);
+                    storeNode(ns.id,fh,dimensionality,maxCap,ns);
+                    storeNode(root_node.id,fh,dimensionality,maxCap,root_node);
+                    (new_node_id)++;
+                    return std::make_tuple(false,new_root);
+                }
                 return std::make_tuple(true,ns);
             }
         }else{
@@ -453,17 +509,17 @@ std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap
                     if (root_node.parent_id==-1){
                         int new_root_mbr[2*dimensionality];
                         generate_new_mbr_2d(root_node.current_MBR,ns.current_MBR,new_root_mbr,dimensionality);
-                        Node new_root = Node(*new_node_id,dimensionality,new_root_mbr,-1,maxCap);
+                        Node new_root = Node(new_node_id,dimensionality,new_root_mbr,-1,maxCap);
                         ns.parent_id = new_root.id;
                         root_node.parent_id = new_root.id;
                         new_root.children[0] = ns.id;
                         new_root.children_MBR[0] = ns.current_MBR;
                         new_root.children[1] = root_node.id;
                         new_root.children_MBR[1] = root_node.current_MBR;
-                        storeNode(*new_node_id,fh,dimensionality,maxCap,new_root);
+                        storeNode(new_node_id,fh,dimensionality,maxCap,new_root);
                         storeNode(ns.id,fh,dimensionality,maxCap,ns);
                         storeNode(root_node.id,fh,dimensionality,maxCap,root_node);
-                        (*new_node_id)++;
+                        (new_node_id)++;
                         return std::make_tuple(false,new_root);
                     }
                     return std::make_tuple(true,ns);
@@ -701,7 +757,7 @@ int main(int argv, char **argc){
     int dimensionality = atoi(argc[3]);
     const char *output_file = argc[4];
     FileManager fm;
-    // std::cout << query_file << " " << maxCap << " " << dimensionality << " " << output_file << std::endl;
+    std::cout << query_file << " " << maxCap << " " << dimensionality << " " << output_file << std::endl;
 
     // create rtree file
     FileHandler fh_rtree = fm.CreateFile("rtree.txt");
@@ -730,14 +786,14 @@ int main(int argv, char **argc){
                 // std::cout << line << std::endl;
                 int delim_pos = line.find(" ");
                 const char* bulk_load_file = ("./"+line.substr(0, delim_pos)).c_str();
-                // std::cout << bulk_load_file << std::endl;
+                std::cout << bulk_load_file << std::endl;
                 int N = std::stoi(line.substr(delim_pos+1, line.size()-delim_pos-1));
-                // std::cout << N << std::endl;
+                std::cout << N << std::endl;
                 // open bulk load file
                 FileHandler bulk_load_file_handler = fm.OpenFile(bulk_load_file);
-                // std::cout << "ok" << std::endl;
+                std::cout << "ok" << std::endl;
                 std::tuple<FileHandler, int, int> ans = BulkLoad(bulk_load_file_handler, fh_rtree, N, maxCap, dimensionality);
-                // std::cout << "ok" << std::endl;
+                std::cout << "ok" << std::endl;
                 root_id = std::get<1>(ans);
                 numNodes = std::get<2>(ans);
                 fm.CloseFile(bulk_load_file_handler);
@@ -746,6 +802,10 @@ int main(int argv, char **argc){
                 output_file_handle << std::endl;
             }else if (query_type==1){
                 //insert
+                std::cout<<"Insert Statement"<<std::endl;
+                if (root_id==-1){
+                    root_id = 0;
+                }
                 line = line.substr(7, line.size()-7);
                 int *P = new int[dimensionality];
                 for (int i=0; i<dimensionality; i++){
@@ -753,8 +813,11 @@ int main(int argv, char **argc){
                     P[i] = std::stoi(line.substr(0, space_pos));
                     line = line.substr(space_pos+1, line.size()-space_pos-1);
                 }
-                std::tuple<bool, Node> ans = insert(P, root_id, dimensionality, maxCap, fh_rtree, &numNodes);
-                numNodes++;
+                std::tuple<bool, Node> ans = insert(P, root_id, dimensionality, maxCap, fh_rtree, numNodes);
+                if (std::get<0>(ans)){
+                    root_id = (std::get<1>(ans)).id;
+                }
+                // numNodes++;
                 output_file_handle << "INSERT" << std::endl;
                 output_file_handle << std::endl;
                 output_file_handle << std::endl;
