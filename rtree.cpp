@@ -157,18 +157,10 @@ int get_volume(int* mbr,int dim){
 //Given a node id, is it a leaf?
 bool check_if_leaf(int node_id,int dim,int mC,FileHandler& fh){
     Node n = getNode(node_id,dim,mC,fh);
-    if (n.children[0]!=-1){
-        return false;
+    if (n.children[0]==-1){
+        return true;
     }
-    return true;
-    for (int i=0;i<dim;i++){
-        if ( (n.current_MBR[i] == n.current_MBR[i+dim])){
-            continue;
-        }else{
-            return false;
-        }
-    }
-    return true;
+    return false;
 
 }
 //Distance between 2 points
@@ -191,15 +183,15 @@ int distance_mbrs(int* mbr1, int* mbr2, int* new_mbr, int dim){
 //Splits a node into 2. Returns the new node
 Node Node::split(int original_node_id,int &new_node_id,int dim,int mC,FileHandler& fh,Node new_node_to_add){
     Node org_node = getNode(original_node_id,dim,mC,fh);
-    std::cout<<"Going to split node: "<<org_node.id<<std::endl;
-    std::cout<<"This node has children: ";
-    for (int i=0;i<mC;i++){
-        std::cout<<org_node.children[i]<<" ";
-    }
-    std::cout<<"\n";
+    // std::cout<<"Going to split node: "<<org_node.id<<std::endl;
+    // std::cout<<"This node has children: ";
+    // for (int i=0;i<mC;i++){
+    //     std::cout<<org_node.children[i]<<" ";
+    // }
+    // std::cout<<"\n";
     int min_fill = ceil(mC/2);
     //getting the farthest seeds
-    int e1,e2,max_distance=-1;
+    int e1=0,e2=1,max_distance=-1;
     
     int* children = org_node.children;
 
@@ -214,7 +206,6 @@ Node Node::split(int original_node_id,int &new_node_id,int dim,int mC,FileHandle
         checked_new_node = false;
 
         for (int j=i+1;j<mC+1;j++){
-            std::cout<<i<<" "<<j<<std::endl;
             if ((j==mC || org_node.children[j] == -1) && checked_new_node==true){
                 break;
             }else if(j==mC || org_node.children[j]==-1){
@@ -252,7 +243,7 @@ Node Node::split(int original_node_id,int &new_node_id,int dim,int mC,FileHandle
         }
     }
 
-    std::cout<<"Farthest 2 seed's id: "<<e1<<":"<<org_node.children[e1]<<" and "<<e2<<":"<<org_node.children[e2]<<std::endl;
+    // std::cout<<"Farthest 2 seed's id: "<<e1<<":"<<org_node.children[e1]<<" and "<<e2<<":"<<org_node.children[e2]<<std::endl;
     //selecting which key goes to which. to new_node means true
     bool groups[mC+1];
     groups[e1]=true;
@@ -334,27 +325,28 @@ Node Node::split(int original_node_id,int &new_node_id,int dim,int mC,FileHandle
         }
     }
 
-    std::cout<<"groups: ";
-    for (int i=0;i<mC+1;i++){
-        std::cout<<groups[i]<<" ";
-    }
-    std::cout<<"\n";
+    // std::cout<<"groups: ";
+    // for (int i=0;i<mC+1;i++){
+    //     std::cout<<groups[i]<<" ";
+    // }
+    // std::cout<<"\n";
     //We now have groups with true meaning the new_node and false meaning the old_node
     int numC2=0;
     int numC1=0;
     // int new_node_MBR[2*dim];
-    Node new_node = Node(new_node_id,dim,mbr2,-1,mC);
+    Node new_node = Node(new_node_id,dim,mbr2,org_node.parent_id,mC);
 
     for (int i=0;i<mC+1;i++){
         bool t = groups[i];
 
-        if (t){
+        if (t==true){
 
             if (i!=mC){
                 new_node.children[numC2]=org_node.children[i];
                 new_node.children_MBR[numC2++] = org_node.children_MBR[i];
                 Node child_node = getNode(org_node.children[i],dim,mC,fh);
                 child_node.parent_id = new_node_id;
+                storeNode(child_node.id,fh,dim,mC,child_node);
             }else{
                 new_node.children[numC2]=new_node_to_add.id;
                 new_node.children_MBR[numC2++] = new_node_to_add.current_MBR;
@@ -373,6 +365,13 @@ Node Node::split(int original_node_id,int &new_node_id,int dim,int mC,FileHandle
             }
         }
     }
+    for (int i=numC1;i<mC;i++){
+        org_node.children[i]=-1;
+    }
+    for (int i=numC2;i<mC;i++){
+        new_node.children[i]=-1;
+    }
+    storeNode(new_node_to_add.id,fh,dim,mC,new_node_to_add);
     storeNode(new_node.id,fh,dim,mC,new_node);
     storeNode(org_node.id,fh,dim,mC,org_node);
     (new_node_id)++;
@@ -382,11 +381,15 @@ Node Node::split(int original_node_id,int &new_node_id,int dim,int mC,FileHandle
 //The main insert function
 std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler& fh,int& new_node_id){
     Node root_node = getNode(root_id,dimensionality,maxCap,fh);
-    std::cout<<"Current Node: "<<root_node.id<<std::endl;
-
+    // std::cout<<"Current Node: "<<root_node.id<<std::endl;
+    // std::cout<<"Children ";
+    // for (int i=0;i<maxCap;i++){
+    //     std::cout<<root_node.children[i]<<" ";
+    // }
+    // std::cout<<std::endl;
     //Will come true if only root and is the first insert
     bool is_leaf = check_if_leaf(root_id,dimensionality,maxCap,fh);
-    std::cout<<"is_leaf: "<<is_leaf<<std::endl;
+    // std::cout<<"is_leaf: "<<is_leaf<<std::endl;
 
     Node new_node = Node(new_node_id,dimensionality,P,root_id,maxCap);
     for (int i=dimensionality;i<2*dimensionality;i++){
@@ -405,7 +408,7 @@ std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap
     }else{
 
         bool is_child_leaf = check_if_leaf(root_node.children[0],dimensionality,maxCap,fh);
-        std::cout<<"Is child a leaf? "<<is_child_leaf<<"\n";
+        // std::cout<<"Is child: "<<root_node.children[0] <<" a leaf? "<<is_child_leaf<<"\n";
         int num_children=0;
         for (int i=0;i<maxCap;i++){
             if (root_node.children[i]==-1){
@@ -498,6 +501,8 @@ std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap
                     root_node.current_MBR = generate_new_mbr(root_node.current_MBR,P,dimensionality);
                     root_node.children[num_children] = n.id;
                     root_node.children_MBR[num_children] = n.current_MBR;
+                    n.parent_id = root_id;
+                    storeNode(n.id,fh,dimensionality,maxCap,n);
                     storeNode(root_id,fh,dimensionality,maxCap,root_node);
                     return std::make_tuple(false,Node(-1,0,{},-1,0));
                 }else{
@@ -824,7 +829,7 @@ int main(int argv, char **argc){
     int dimensionality = atoi(argc[3]);
     const char *output_file = argc[4];
     FileManager fm;
-    std::cout << query_file << " " << maxCap << " " << dimensionality << " " << output_file << std::endl;
+    // std::cout << query_file << " " << maxCap << " " << dimensionality << " " << output_file << std::endl;
 
     // create rtree file
     FileHandler fh_rtree = fm.CreateFile("rtree.txt");
@@ -837,7 +842,7 @@ int main(int argv, char **argc){
     int numNodes = 0;
     if (query_file_handle.is_open()){
         while (std::getline(query_file_handle, line)){
-            std::cout << line << std::endl;
+            // std::cout << line << std::endl;
             int query_type = -1; // 0 - bulk load, 1 - insert, 2 - point query
             if (line.substr(0, 5)=="QUERY"){
                 query_type = 2;
@@ -852,15 +857,18 @@ int main(int argv, char **argc){
                 line = line.substr(9, line.size()-9);
                 // std::cout << line << std::endl;
                 int delim_pos = line.find(" ");
-                const char* bulk_load_file = ("./"+line.substr(0, delim_pos)).c_str();
-                std::cout << bulk_load_file << std::endl;
+                // std::cout<<line<<std::endl;
+                // const char* bulk_load_file = ("./"+line.substr(0, delim_pos)).c_str();
+                std::string temp = line.substr(0,delim_pos);
+                char* bulk_load_file = const_cast<char*>(temp.c_str());
+                // std::cout <<"Boom:"<< bulk_load_file << std::endl;
                 int N = std::stoi(line.substr(delim_pos+1, line.size()-delim_pos-1));
-                std::cout << N << std::endl;
+                // std::cout << N << std::endl;
                 // open bulk load file
                 FileHandler bulk_load_file_handler = fm.OpenFile(bulk_load_file);
-                std::cout << "ok" << std::endl;
+                // std::cout << "ok" << std::endl;
                 std::tuple<FileHandler, int, int> ans = BulkLoad(bulk_load_file_handler, fh_rtree, N, maxCap, dimensionality);
-                std::cout << "ok" << std::endl;
+                // std::cout << "ok" << std::endl;
                 root_id = std::get<1>(ans);
                 numNodes = std::get<2>(ans);
                 fm.CloseFile(bulk_load_file_handler);
@@ -868,9 +876,9 @@ int main(int argv, char **argc){
                 output_file_handle << std::endl;
                 output_file_handle << std::endl;
                 checkTree(fh_rtree, numNodes, dimensionality, maxCap);
+
             }else if (query_type==1){
                 //insert
-                std::cout<<"Insert Statement"<<std::endl;
                 if (root_id==-1){
                     root_id = 0;
                 }
