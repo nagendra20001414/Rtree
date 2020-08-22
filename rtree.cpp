@@ -33,7 +33,7 @@ int numNodesPerPage(int dimensionality, int maxCap){
 Node getNode(int id, int dimensionality, int maxCap, FileHandler& fh){
     int int_increment = sizeof(int)/sizeof(char);
     int page_num = int(id/numNodesPerPage(dimensionality, maxCap));
-    std::cout << page_num << " page access" << std::endl;
+    // std::cout << page_num << " page access" << std::endl;
     PageHandler ph = fh.PageAt(page_num);
     int page_offset = id % numNodesPerPage(dimensionality, maxCap);
     page_offset *= (((2*dimensionality)+2+maxCap+(maxCap*2*dimensionality))*int_increment);
@@ -105,6 +105,7 @@ void storeNode(int id,FileHandler& fh,int dim,int maxCap,Node n){
     }
     
     fh.MarkDirty(page_num);
+    fh.UnpinPage(page_num);
     fh.FlushPage(page_num);
     // fh.FlushPages();
 }
