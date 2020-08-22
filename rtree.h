@@ -19,6 +19,9 @@ class Node{
         Node(int id, int dimensionality, int maxCap){
             this->id = id;
             this->current_MBR = new int[2*dimensionality];
+            for (int i=0;i<2*dimensionality;i++){
+                this->current_MBR[i] = -1;
+            }
             this->parent_id = -1;
             this->children = new int[maxCap];
             this->children_MBR = new int*[maxCap];
@@ -39,7 +42,7 @@ class Node{
 
 
 
-        Node split(int orginal_node_id,int* new_node_id,int dim,int mC,FileHandler& fh,Node new_node_to_add);
+        Node split(int orginal_node_id,int& new_node_id,int dim,int mC,FileHandler& fh,Node new_node_to_add);
 
         bool is_leaf(Node node, int maxCap, int dimensionality){
             for (int i=0; i<maxCap; i++){
@@ -59,5 +62,6 @@ class Node{
 };
 
 Node getNode(int id, int dimensionality, int maxCap, FileHandler& fh);
-void storeNode(int id,FileHandler& fh,int dime,int maxCap, Node n);
+void storeNode(int id,FileHandler& fh,int dime,int maxCap, Node &n);
+std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap, FileHandler& fh,int& new_node_id);
 
