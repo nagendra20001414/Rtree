@@ -45,10 +45,8 @@ class Node{
         Node split(int orginal_node_id,int& new_node_id,int dim,int mC,FileHandler& fh,Node new_node_to_add);
 
         bool is_leaf(Node node, int maxCap, int dimensionality){
-            for (int i=0; i<maxCap; i++){
-                if (node.children[i]==-1){
-                    return true;
-                }
+            if (node.children[0]==-1){
+                return true;
             }
             for (int dimension=0; dimension<dimensionality; dimension++){
                 if (node.current_MBR[dimension]!=node.current_MBR[dimension+dimensionality]){
