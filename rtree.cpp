@@ -146,8 +146,8 @@ void generate_new_mbr_2d(int* mbr1,int* mbr2, int* new_mbr,int dim){
 }
 
 //Function to generate volume from an MBR
-int get_volume(int* mbr,int dim){
-    int vol = 1;
+double get_volume(int* mbr,int dim){
+    double vol = 1;
     for (int i=0;i<dim;i++){
         vol *= (abs(mbr[i+dim]-mbr[i]));
     }
@@ -174,8 +174,8 @@ int distance_points(int* p1, int*p2, int dim){
 
 //Distance Between 2 MBRs. Can be negative
 int distance_mbrs(int* mbr1, int* mbr2, int* new_mbr, int dim){
-    int v1 = get_volume(mbr1,dim),v2=get_volume(mbr2,dim);
-    int v_new=get_volume(new_mbr,dim);
+    double v1 = get_volume(mbr1,dim),v2=get_volume(mbr2,dim);
+    double v_new=get_volume(new_mbr,dim);
 
     return v_new-(v1+v2);
 }
@@ -300,7 +300,7 @@ Node Node::split(int original_node_id,int &new_node_id,int dim,int mC,FileHandle
             // int* new_mbr1,*new_mbr2;
             int new_mbr1[2*dim];
             int new_mbr2[2*dim];
-            int v1 = get_volume(mbr1,dim),v2 = get_volume(mbr2,dim);
+            double v1 = get_volume(mbr1,dim),v2 = get_volume(mbr2,dim);
             if (i==mC){
                 generate_new_mbr_2d(mbr1,new_node_to_add.current_MBR,new_mbr1,dim);
                 d1 = distance_mbrs(mbr1,new_node_to_add.current_MBR,new_mbr1,dim);
@@ -477,9 +477,9 @@ std::tuple<bool,Node> insert(int* P, int root_id, int dimensionality, int maxCap
                 if (children[i]==-1){
                     break;
                 }else{
-                    int vol = get_volume(root_node.children_MBR[i],dimensionality);
+                    double vol = get_volume(root_node.children_MBR[i],dimensionality);
                     int* new_mbr = generate_new_mbr(root_node.children_MBR[i],P,dimensionality);
-                    int new_vol = get_volume(new_mbr,dimensionality);
+                    double new_vol = get_volume(new_mbr,dimensionality);
                     int diff = new_vol-vol;
                     if (min_inc==-1){
                         min_inc = diff;
