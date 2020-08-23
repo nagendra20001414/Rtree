@@ -564,7 +564,8 @@ bool does_contain_mbr(int* mbr, int* point, int dimensionality){
 
 bool PointQuery(int* P, int node_id, int dimensionality, int maxCap, FileHandler& fh){
     Node search_node = getNode(node_id, dimensionality, maxCap, fh);
-    std::cout << "ok" << std::endl;
+    // std::cout << "ok" << std::endl;
+    std::cout << "search " << node_id << std::endl;
 
     if (search_node.is_leaf(search_node, maxCap, dimensionality)){
         // if the node is a leaf
@@ -607,8 +608,7 @@ void saveNode(Node new_node, int dimensionality, int maxCap, PageHandler& ph, in
 
 }
 
-int* getMBR(int** children_MBR, int* children, int maxCap, int dimensionality){
-    int* MBR = new int[2*dimensionality];
+void getMBR(int* MBR,int** children_MBR, int* children, int maxCap, int dimensionality){
     for (int dimension=0; dimension<dimensionality; dimension++){
         MBR[dimension] = children_MBR[0][dimension];
         MBR[dimension+dimensionality] = children_MBR[0][dimension+dimensionality];
@@ -621,7 +621,6 @@ int* getMBR(int** children_MBR, int* children, int maxCap, int dimensionality){
             }
         }
     }
-    return MBR;
 }
 
 Node getNode_and_setParent(int id, int dimensionality, int maxCap, FileHandler& fh, int parent_id, PageHandler& ph_using){
@@ -656,6 +655,7 @@ Node getNode_and_setParent(int id, int dimensionality, int maxCap, FileHandler& 
             read_pointer+=(2*dimensionality*int_increment);
             myNode.children[i] = children[i];
         }
+        return myNode;
 
     }else{
 
@@ -740,10 +740,13 @@ int AssignParents(FileHandler& fh, int start_index, int end_index, int dimension
             Node child_node = getNode_and_setParent(end_index+1-remaining_nodes, dimensionality, maxCap, fh, node_id-1, parent_nodes);
             // Node child_node = getNode(end_index+1-remaining_nodes, dimensionality, maxCap, fh);
             new_node.children[i] = end_index+1-remaining_nodes;
-            new_node.children_MBR[i] = child_node.current_MBR;
+            for (int j=0; j<2*dimensionality; j++){
+                new_node.children_MBR[i][j] = child_node.current_MBR[j];
+            }
+            // new_node.children_MBR[i] = child_node.current_MBR;
             remaining_nodes--;
         }
-        new_node.current_MBR = getMBR(new_node.children_MBR, new_node.children, maxCap, dimensionality);
+        getMBR(new_node.current_MBR, new_node.children_MBR, new_node.children, maxCap, dimensionality);
         saveNode(new_node, dimensionality, maxCap, parent_nodes, num_nodes_in_page);
         // std::cout << "d " << new_node.id << std::endl;
         num_nodes_in_page++;
@@ -753,12 +756,6 @@ int AssignParents(FileHandler& fh, int start_index, int end_index, int dimension
         fh.UnpinPage(parent_nodes.GetPageNum());
         fh.FlushPage(parent_nodes.GetPageNum());
         std::cout << parent_nodes.GetPageNum() << " written1" <<std::endl;
-    }
-    if (end_index+1 <= 163 && node_id-1>=163){
-        Node n = getNode(163, dimensionality, maxCap, fh);
-        std::cout << n.id << " u" << std::endl;
-        n = getNode(174, dimensionality, maxCap, fh);
-        std::cout << n.id << " u" << std::endl;
     }
     if (num_parents_created>1){
         return AssignParents(fh, end_index+1, node_id-1, dimensionality, maxCap);
@@ -799,8 +796,8 @@ std::tuple<FileHandler, int, int> BulkLoad(FileHandler& fh, FileHandler& fh_out,
         node_id +=1;
         int* current_MBR = (int*)data;
         for (int dimension=0; dimension < dimensionality; dimension++){
-            new_node.current_MBR[dimension] = current_MBR[dimension];
-            new_node.current_MBR[dimension+dimensionality] = current_MBR[dimension];
+            new_node.current_MBR[dimension] = current_MBR[offset+dimension];
+            new_node.current_MBR[dimension+dimensionality] = current_MBR[offset+dimension];
         }
         saveNode(new_node, dimensionality, maxCap, ph_out, num_nodes_in_page);
         num_nodes_in_page++;
@@ -890,7 +887,7 @@ int main(int argv, char **argc){
                 output_file_handle << "BULKLOAD" << std::endl;
                 output_file_handle << std::endl;
                 output_file_handle << std::endl;
-                checkTree(fh_rtree, numNodes, dimensionality, maxCap);
+                // checkTree(fh_rtree, numNodes, dimensionality, maxCap);
 
             }else if (query_type==1){
                 //insert
